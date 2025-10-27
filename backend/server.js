@@ -1,103 +1,131 @@
+// ======== server.js ========
 import express from "express";
-import cors from "cors";
 import mongoose from "mongoose";
+import cors from "cors";
+import fetch from "node-fetch";
 import dotenv from "dotenv";
-import paypal from "@paypal/checkout-server-sdk";
+import User from "./userModel.js"; // ton modèle utilisateur
 
 dotenv.config();
+
 const app = express();
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// --- 1️⃣ Connexion MongoDB ---
-mongoose.connect(process.env.MONGO_URI)
+// ===============================
+// 🔗 Connexion MongoDB
+// ===============================
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Connecté à MongoDB"))
-  .catch(err => console.error("❌ Erreur MongoDB :", err));
+  .catch((err) => console.error("❌ Erreur MongoDB :", err));
 
+// ===============================
+// 💰 PayPal Configuration
+// ===============================
+const PAYPAL_API = "https://api-m.sandbox.paypal.com"; // toujours sandbox pour les tests
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
 
-// --- 2️⃣ Schéma utilisateur ---
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true },
-  credits: { type: Number, default: 0 },
-});
-const User = mongoose.model("User", userSchema);
+// ===============================
+// 📩 Routes pour gérer les crédits
+// ===============================
 
-// --- 3️⃣ Configuration PayPal ---
-const paypalEnv = new paypal.core.LiveEnvironment(
-  process.env.PAYPAL_CLIENT_ID,
-  process.env.PAYPAL_SECRET
-);
-const paypalClient = new paypal.core.PayPalHttpClient(paypalEnv);
-
-// --- 4️⃣ Créer une commande ---
-app.post("/api/paypal/create-order", async (req, res) => {
-  const { amount } = req.body;
-
-  const request = new paypal.orders.OrdersCreateRequest();
-  request.prefer("return=representation");
-  request.requestBody({
-    intent: "CAPTURE",
-    purchase_units: [{ amount: { currency_code: "EUR", value: amount } }],
-  });
-
-  try {
-    const order = await paypalClient.execute(request);
-    res.json({ id: order.result.id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Erreur création commande");
-  }
-});
-
-// --- 5️⃣ Capturer une commande PayPal et ajouter des crédits ---
-app.post("/api/paypal/capture-order", async (req, res) => {
-  const { orderID, email } = req.body;
-
-  const request = new paypal.orders.OrdersCaptureRequest(orderID);
-  request.requestBody({});
-
-  try {
-    const capture = await paypalClient.execute(request);
-    const amount = parseFloat(
-      capture.result.purchase_units[0].payments.captures[0].amount.value
-    );
-
-    let creditsToAdd = 0;
-    if (amount === 1) creditsToAdd = 1; // 1€ = 1 crédit
-    else if (amount === 15) creditsToAdd = 20; // VIP
-    else if (amount === 30) creditsToAdd = 50; // PREMIUM
-
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $inc: { credits: creditsToAdd } },
-      { new: true, upsert: true }
-    );
-
-    res.json({ success: true, credits: user.credits });
-  } catch (err) {
-    console.error("Erreur capture PayPal :", err);
-    res.status(500).send("Erreur capture commande");
-  }
-});
-
-// --- 6️⃣ Récupérer les crédits d’un utilisateur ---
+// ➕ Récupérer les crédits d’un utilisateur
 app.get("/api/credits/:email", async (req, res) => {
   const { email } = req.params;
   try {
     const user = await User.findOne({ email });
-    if (!user) {
-      // Si l'utilisateur n'existe pas encore → renvoyer 0
-      return res.json({ credits: 0 });
-    }
-    // Sinon renvoyer ses vrais crédits
+    if (!user) return res.json({ credits: 0 });
     res.json({ credits: user.credits });
   } catch (err) {
     console.error("Erreur récupération crédits :", err);
-    res.status(500).send("Erreur récupération crédits");
+    res.status(500).json({ error: "Erreur récupération crédits" });
   }
 });
 
+// ===============================
+// 💳 Routes PayPal
+// ===============================
 
-// --- 7️⃣ Lancement du serveur ---
-const PORT = process.env.PORT || 3001;
+// 🧾 Création de commande PayPal
+app.post("/api/paypal/create-order", async (req, res) => {
+  try {
+    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:
+          "Basic " + Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64"),
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            amount: {
+              currency_code: "EUR",
+              value: req.body.amount, // montant envoyé par le frontend
+            },
+          },
+        ],
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Erreur API PayPal:", data);
+      return res.status(500).json({ error: "Erreur API PayPal", details: data });
+    }
+
+    console.log("✅ Commande PayPal créée :", data.id);
+    res.json(data);
+  } catch (err) {
+    console.error("Erreur création commande PayPal:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 💰 Capture du paiement PayPal et ajout de crédits
+app.post("/api/paypal/capture-order/:orderID", async (req, res) => {
+  const { orderID } = req.params;
+  const { email } = req.body;
+
+  try {
+    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderID}/capture`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization:
+          "Basic " + Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64"),
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Erreur capture PayPal:", data);
+      return res.status(500).json({ error: "Erreur capture PayPal", details: data });
+    }
+
+    // ✅ Créditer l’utilisateur après paiement
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $inc: { credits: 10 } }, // ajoute 10 crédits par exemple
+      { new: true, upsert: true }
+    );
+
+    console.log(`✅ Paiement capturé pour ${email} — crédits: ${user.credits}`);
+    res.json({ success: true, order: data, credits: user.credits });
+  } catch (err) {
+    console.error("Erreur capture PayPal:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===============================
+// 🚀 Démarrage du serveur
+// ===============================
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));
+

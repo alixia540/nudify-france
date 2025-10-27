@@ -5,9 +5,10 @@ import logo from "../assets/logo.png";
 export default function Layout({ children }) {
   const [credits, setCredits] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const email = "demo@nudify.fr";
 
-  // 🎯 Fetch des crédits
+  // 🎯 Fetch crédits
   useEffect(() => {
     const fetchCredits = async () => {
       try {
@@ -25,15 +26,15 @@ export default function Layout({ children }) {
     return () => clearInterval(interval);
   }, [email]);
 
-  // 🎢 Détection du scroll pour réduire la barre
+  // 🎢 Réduction du header au scroll
   useEffect(() => {
-    const handleScroll = () => {
-      if (window.scrollY > 30) setScrolled(true);
-      else setScrolled(false);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 30);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // 🎛️ Toggle menu mobile
+  const toggleMenu = () => setMenuOpen(!menuOpen);
 
   return (
     <div className="min-h-screen bg-[#1E1E2F] text-white flex flex-col">
@@ -47,9 +48,7 @@ export default function Layout({ children }) {
           <img
             src={logo}
             alt="Nudify France"
-            className={`object-contain transition-all duration-300 ${
-              scrolled ? "w-10" : "w-14"
-            }`}
+            className={`object-contain transition-all duration-300 ${scrolled ? "w-10" : "w-14"}`}
           />
           <h1
             className={`font-semibold transition-all duration-300 ${
@@ -60,7 +59,7 @@ export default function Layout({ children }) {
           </h1>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation Desktop */}
         <nav
           className={`hidden sm:flex space-x-6 pr-5 font-medium transition-all duration-300 ${
             scrolled ? "text-sm" : "text-[15px]"
@@ -84,15 +83,36 @@ export default function Layout({ children }) {
           </Link>
         </nav>
 
-        {/* Crédits */}
+        {/* Bouton Menu Mobile (sans react-icons) */}
+        <button
+          className="sm:hidden pr-5 text-2xl font-bold focus:outline-none"
+          onClick={toggleMenu}
+        >
+          {menuOpen ? "✕" : "☰"}
+        </button>
+
+        {/* 💰 Crédits */}
         <div
-          className={`bg-blue-600 mr-4 rounded-full text-xs font-semibold shadow-sm px-3 py-1 transition-all duration-300 ${
+          className={`bg-blue-600 hidden sm:block mr-5 rounded-full text-sm font-semibold shadow-md px-4 py-1.5 transition-all duration-300 ${
             scrolled ? "scale-90" : "scale-100"
           }`}
         >
           💰 {credits} crédits
         </div>
       </header>
+
+      {/* MENU MOBILE */}
+      {menuOpen && (
+        <div className="fixed top-[60px] left-0 w-full bg-[#1E1E2F] border-t border-white/10 flex flex-col items-center space-y-5 py-6 sm:hidden z-40">
+          <Link onClick={toggleMenu} to="/" className="text-lg hover:text-blue-400">Accueil</Link>
+          <Link onClick={toggleMenu} to="/tarifs" className="text-lg hover:text-blue-400">Tarifs</Link>
+          <Link onClick={toggleMenu} to="/avant-apres" className="text-lg hover:text-blue-400">Avant / Après</Link>
+          <Link onClick={toggleMenu} to="/support" className="text-lg hover:text-blue-400">Support</Link>
+          <div className="bg-blue-600 rounded-full px-5 py-1 text-sm font-semibold shadow-md">
+            💰 {credits} crédits
+          </div>
+        </div>
+      )}
 
       {/* MARGE pour éviter que le contenu soit caché */}
       <div className="h-[80px]" />
