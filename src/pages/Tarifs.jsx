@@ -2,51 +2,36 @@ import React from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function Tarifs() {
-  const email = "demo@nudify.fr"; // tu pourras plus tard utiliser le vrai utilisateur connecté
+  const email = "demo@nudify.fr";
 
-  const tarifs = [
-    {
-      id: "basic",
-      title: "Photo unique",
-      description: "1 crédit par génération IA",
-      color: "from-blue-400 to-pink-500",
-      price: "1 €",
-      value: "1.00",
-      benefits: ["1 image générée", "Résultat HD", "Livraison instantanée"],
-    },
-    {
-      id: "vip",
-      title: "Pass VIP",
-      description: "Accès prioritaire + génération rapide",
-      color: "from-pink-400 to-purple-500",
-      price: "15 €",
-      value: "15.00",
-      benefits: [
-        "20 images générées",
-        "Accès prioritaire",
-        "Support dédié",
-      ],
-    },
-    {
-      id: "premium",
-      title: "Pass PREMIUM",
-      description: "Support prioritaire + bonus crédits",
-      color: "from-blue-500 to-cyan-400",
-      price: "30 €",
-      value: "30.00",
-      benefits: [
-        "50 images générées",
-        "Support premium",
-        "Bonus crédits offerts",
-      ],
-    },
-  ];
-
-  // 🔁 Détection automatique de l'environnement
   const API_BASE =
     window.location.hostname === "localhost"
       ? "http://localhost:10000"
       : "https://nudify-backend.onrender.com";
+
+  const tarifs = [
+    {
+      title: "Photo unique",
+      desc: "1 crédit par génération IA",
+      price: "1 €",
+      amount: "1.00",
+      gradient: "from-blue-400 to-pink-500",
+    },
+    {
+      title: "Pass VIP",
+      desc: "20 images générées - accès prioritaire",
+      price: "15 €",
+      amount: "15.00",
+      gradient: "from-pink-400 to-purple-500",
+    },
+    {
+      title: "Pass PREMIUM",
+      desc: "50 images + support premium",
+      price: "30 €",
+      amount: "30.00",
+      gradient: "from-blue-500 to-cyan-400",
+    },
+  ];
 
   const createOrder = async (amount) => {
     const res = await fetch(`${API_BASE}/api/paypal/create-order`, {
@@ -55,18 +40,15 @@ export default function Tarifs() {
       body: JSON.stringify({ amount }),
     });
     const data = await res.json();
-    console.log("✅ Commande PayPal créée :", data);
     return data.id;
   };
 
   const captureOrder = async (orderId) => {
-    const res = await fetch(`${API_BASE}/api/paypal/capture-order`, {
+    await fetch(`${API_BASE}/api/paypal/capture-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, email }),
     });
-    const data = await res.json();
-    console.log("✅ Commande capturée :", data);
     alert("✅ Paiement réussi ! Tes crédits ont été ajoutés.");
     window.location.reload();
   };
@@ -77,11 +59,6 @@ export default function Tarifs() {
         Nos Tarifs
       </h1>
 
-      <p className="text-gray-300 text-center mb-12 max-w-2xl">
-        Choisis le pack adapté à ton usage.  
-        Chaque crédit te permet de générer une photo IA de haute qualité.
-      </p>
-
       <PayPalScriptProvider
         options={{
           "client-id": "AdYF4FyjBUKIR0JZ4buk5NLnICKEI726JnNOr9eHXFAClWbEhe5AKtVnllynoWA2Ib5Jkm6eD5aMEpko",
@@ -89,34 +66,27 @@ export default function Tarifs() {
         }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {tarifs.map((item) => (
+          {tarifs.map((pack, i) => (
             <div
-              key={item.id}
-              className="bg-[#252542] rounded-2xl p-8 shadow-xl border border-white/10 hover:scale-105 hover:border-pink-400/40 transition-all duration-300 flex flex-col items-center"
+              key={i}
+              className="bg-[#252542] rounded-2xl p-8 shadow-lg border border-white/10 flex flex-col items-center hover:scale-105 transition-all duration-300"
             >
               <h2
-                className={`text-2xl font-bold mb-3 bg-gradient-to-r ${item.color} bg-clip-text text-transparent`}
+                className={`text-2xl font-bold mb-3 bg-gradient-to-r ${pack.gradient} bg-clip-text text-transparent`}
               >
-                {item.title}
+                {pack.title}
               </h2>
-              <p className="text-gray-400 mb-6">{item.description}</p>
+              <p className="text-gray-400 mb-4">{pack.desc}</p>
+              <p className="text-4xl font-extrabold mb-4">{pack.price}</p>
 
-              <p className="text-4xl font-extrabold mb-4">{item.price}</p>
-
-              <ul className="text-gray-300 text-sm mb-6 space-y-2">
-                {item.benefits.map((b, j) => (
-                  <li key={j}>✅ {b}</li>
-                ))}
-              </ul>
-
-              <div className="w-full mt-auto">
-                <PayPalButtons
-                  style={{ layout: "vertical", color: "blue", shape: "rect" }}
-                  createOrder={() => createOrder(item.value)}
-                  onApprove={(data) => captureOrder(data.orderID)}
-                  onError={(err) => alert("❌ Erreur PayPal : " + err.message)}
-                />
-              </div>
+              <PayPalButtons
+                style={{ layout: "vertical", color: "blue", shape: "rect" }}
+                createOrder={() => createOrder(pack.amount)}
+                onApprove={(data) => captureOrder(data.orderID)}
+                onError={(err) =>
+                  alert("❌ Erreur PayPal : " + err.message)
+                }
+              />
             </div>
           ))}
         </div>
