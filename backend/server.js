@@ -1,86 +1,103 @@
 import express from "express";
 import cors from "cors";
-import bodyParser from "body-parser";
-import paypal from "@paypal/checkout-server-sdk";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import paypal from "@paypal/checkout-server-sdk";
 
 dotenv.config();
 const app = express();
+app.use(express.json());
 app.use(cors());
-app.use(bodyParser.json());
 
-// 🧩 MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-mongoose.connection.on("connected", () =>
-  console.log("✅ Connecté à MongoDB avec succès")
-);
+// --- 1️⃣ Connexion MongoDB ---
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ Connecté à MongoDB"))
+  .catch(err => console.error("❌ Erreur MongoDB :", err));
 
-// 🧾 Schéma utilisateur
+
+// --- 2️⃣ Schéma utilisateur ---
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   credits: { type: Number, default: 0 },
 });
 const User = mongoose.model("User", userSchema);
 
-// ⚙️ Config PayPal
-const Environment = paypal.core.SandboxEnvironment;
-const client = new paypal.core.PayPalHttpClient(
-  new Environment(
-    process.env.PAYPAL_CLIENT_ID,
-    process.env.PAYPAL_SECRET
-  )
+// --- 3️⃣ Configuration PayPal ---
+const paypalEnv = new paypal.core.LiveEnvironment(
+  process.env.PAYPAL_CLIENT_ID,
+  process.env.PAYPAL_SECRET
 );
+const paypalClient = new paypal.core.PayPalHttpClient(paypalEnv);
 
-// 🔹 Créer une commande PayPal
+// --- 4️⃣ Créer une commande ---
 app.post("/api/paypal/create-order", async (req, res) => {
   const { amount } = req.body;
+
   const request = new paypal.orders.OrdersCreateRequest();
+  request.prefer("return=representation");
   request.requestBody({
     intent: "CAPTURE",
     purchase_units: [{ amount: { currency_code: "EUR", value: amount } }],
   });
 
-  const order = await client.execute(request);
-  res.json({ id: order.result.id });
+  try {
+    const order = await paypalClient.execute(request);
+    res.json({ id: order.result.id });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erreur création commande");
+  }
 });
 
-// 🔹 Capturer une commande et ajouter les crédits
+// --- 5️⃣ Capturer une commande PayPal et ajouter des crédits ---
 app.post("/api/paypal/capture-order", async (req, res) => {
-  const { orderId, email } = req.body;
-  const request = new paypal.orders.OrdersCaptureRequest(orderId);
+  const { orderID, email } = req.body;
+
+  const request = new paypal.orders.OrdersCaptureRequest(orderID);
   request.requestBody({});
-  const capture = await client.execute(request);
 
-  const amount = parseFloat(
-    capture.result.purchase_units[0].payments.captures[0].amount.value
-  );
+  try {
+    const capture = await paypalClient.execute(request);
+    const amount = parseFloat(
+      capture.result.purchase_units[0].payments.captures[0].amount.value
+    );
 
-  // 🎯 Attribution automatique selon ton barème
-  let credits = 0;
-  if (amount === 1.0) credits = 1;
-  else if (amount === 15.0) credits = 20;
-  else if (amount === 30.0) credits = 50;
+    let creditsToAdd = 0;
+    if (amount === 1) creditsToAdd = 1; // 1€ = 1 crédit
+    else if (amount === 15) creditsToAdd = 20; // VIP
+    else if (amount === 30) creditsToAdd = 50; // PREMIUM
 
-  // 📊 Mise à jour dans MongoDB
-  const user = await User.findOneAndUpdate(
-    { email },
-    { $inc: { credits: credits } },
-    { new: true, upsert: true }
-  );
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $inc: { credits: creditsToAdd } },
+      { new: true, upsert: true }
+    );
 
-  res.json({ success: true, newCredits: user.credits });
+    res.json({ success: true, credits: user.credits });
+  } catch (err) {
+    console.error("Erreur capture PayPal :", err);
+    res.status(500).send("Erreur capture commande");
+  }
 });
 
-// 🔹 Récupérer les crédits actuels
+// --- 6️⃣ Récupérer les crédits d’un utilisateur ---
 app.get("/api/credits/:email", async (req, res) => {
   const { email } = req.params;
-  const user = await User.findOne({ email });
-  res.json({ credits: user ? user.credits : 0 });
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Si l'utilisateur n'existe pas encore → renvoyer 0
+      return res.json({ credits: 0 });
+    }
+    // Sinon renvoyer ses vrais crédits
+    res.json({ credits: user.credits });
+  } catch (err) {
+    console.error("Erreur récupération crédits :", err);
+    res.status(500).send("Erreur récupération crédits");
+  }
 });
 
-// 🟢 Serveur actif
-app.listen(3001, () => console.log("🚀 Serveur backend actif sur le port 3001"));
+
+// --- 7️⃣ Lancement du serveur ---
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));
