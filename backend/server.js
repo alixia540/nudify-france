@@ -1,41 +1,92 @@
-// ======== server.js ========
 import express from "express";
-import mongoose from "mongoose";
 import cors from "cors";
-import fetch from "node-fetch";
+import mongoose from "mongoose";
 import dotenv from "dotenv";
-import User from "./userModel.js"; // ton modèle utilisateur
+import paypal from "@paypal/checkout-server-sdk";
 
 dotenv.config();
 
 const app = express();
-app.use(cors());
 app.use(express.json());
 
-// ===============================
-// 🔗 Connexion MongoDB
-// ===============================
+// Autoriser ton front Vercel
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "*",
+  })
+);
+
+// ✅ Connexion MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("✅ Connecté à MongoDB"))
   .catch((err) => console.error("❌ Erreur MongoDB :", err));
 
-// ===============================
-// 💰 PayPal Configuration
-// ===============================
-const PAYPAL_API = "https://api-m.sandbox.paypal.com"; // toujours sandbox pour les tests
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
+// === CONFIG PAYPAL ===
+let environment;
+try {
+  if (process.env.PAYPAL_MODE === "sandbox") {
+    environment = new paypal.core.SandboxEnvironment(
+      process.env.PAYPAL_CLIENT_ID,
+      process.env.PAYPAL_SECRET
+    );
+  } else {
+    environment = new paypal.core.LiveEnvironment(
+      process.env.PAYPAL_CLIENT_ID,
+      process.env.PAYPAL_SECRET
+    );
+  }
+} catch (err) {
+  console.error("❌ Erreur initialisation PayPal :", err);
+}
 
-// ===============================
-// 📩 Routes pour gérer les crédits
-// ===============================
+const client = new paypal.core.PayPalHttpClient(environment);
 
-// ➕ Récupérer les crédits d’un utilisateur
+// === ROUTE TEST ===
+app.get("/", (req, res) => {
+  res.send("✅ Backend Nudify France opérationnel !");
+});
+
+// === ROUTE CREATION COMMANDE PAYPAL ===
+app.post("/api/paypal/create-order", async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount) return res.status(400).json({ error: "Montant manquant" });
+
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
+    request.requestBody({
+      intent: "CAPTURE",
+      purchase_units: [
+        {
+          amount: {
+            currency_code: "EUR",
+            value: amount,
+          },
+        },
+      ],
+    });
+
+    const order = await client.execute(request);
+    console.log("✅ Commande PayPal créée :", order.result.id);
+    res.json({ id: order.result.id });
+  } catch (err) {
+    console.error("❌ Erreur création commande PayPal :", err.message);
+    if (err.response) {
+      console.error("🧾 Réponse PayPal :", err.response);
+      return res.status(err.statusCode || 500).json(err.response);
+    }
+    res.status(500).json({ error: "Erreur création commande PayPal" });
+  }
+});
+
+// === ROUTE CREDITS UTILISATEUR ===
 app.get("/api/credits/:email", async (req, res) => {
   const { email } = req.params;
   try {
-    const user = await User.findOne({ email });
+    const user = await mongoose.connection
+      .collection("users")
+      .findOne({ email });
     if (!user) return res.json({ credits: 0 });
     res.json({ credits: user.credits });
   } catch (err) {
@@ -44,88 +95,9 @@ app.get("/api/credits/:email", async (req, res) => {
   }
 });
 
-// ===============================
-// 💳 Routes PayPal
-// ===============================
-
-// 🧾 Création de commande PayPal
-app.post("/api/paypal/create-order", async (req, res) => {
-  try {
-    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:
-          "Basic " + Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64"),
-      },
-      body: JSON.stringify({
-        intent: "CAPTURE",
-        purchase_units: [
-          {
-            amount: {
-              currency_code: "EUR",
-              value: req.body.amount, // montant envoyé par le frontend
-            },
-          },
-        ],
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("❌ Erreur API PayPal:", data);
-      return res.status(500).json({ error: "Erreur API PayPal", details: data });
-    }
-
-    console.log("✅ Commande PayPal créée :", data.id);
-    res.json(data);
-  } catch (err) {
-    console.error("Erreur création commande PayPal:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 💰 Capture du paiement PayPal et ajout de crédits
-app.post("/api/paypal/capture-order/:orderID", async (req, res) => {
-  const { orderID } = req.params;
-  const { email } = req.body;
-
-  try {
-    const response = await fetch(`${PAYPAL_API}/v2/checkout/orders/${orderID}/capture`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization:
-          "Basic " + Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64"),
-      },
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("❌ Erreur capture PayPal:", data);
-      return res.status(500).json({ error: "Erreur capture PayPal", details: data });
-    }
-
-    // ✅ Créditer l’utilisateur après paiement
-    const user = await User.findOneAndUpdate(
-      { email },
-      { $inc: { credits: 10 } }, // ajoute 10 crédits par exemple
-      { new: true, upsert: true }
-    );
-
-    console.log(`✅ Paiement capturé pour ${email} — crédits: ${user.credits}`);
-    res.json({ success: true, order: data, credits: user.credits });
-  } catch (err) {
-    console.error("Erreur capture PayPal:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ===============================
-// 🚀 Démarrage du serveur
-// ===============================
+// === LANCEMENT DU SERVEUR ===
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Serveur actif sur le port ${PORT} (mode ${process.env.PAYPAL_MODE})`)
+);
 

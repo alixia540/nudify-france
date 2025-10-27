@@ -26,29 +26,43 @@ export default function Home() {
             "client-id": "AdYF4FyjBUKIR0JZ4buk5NLnICKEI726JnNOr9eHXFAClWbEhe5AKtVnllynoWA2Ib5Jkm6eD5aMEpko",
             currency: "EUR",
           }}
-        >
-          <PayPalButtons
-            style={{ layout: "vertical", color: "blue", shape: "rect" }}
-            createOrder={async () => {
-              const res = await fetch("https://nudify-backend.onrender.com/api/paypal/create-order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-              });
-              const data = await res.json();
-              return data.id;
-            }}
-            onApprove={async (data) => {
-              await fetch("https://nudify-backend.onrender.com/api/paypal/capture-order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: data.orderID, email }),
-              });
-              alert("✅ Paiement réussi ! Tes crédits ont été ajoutés.");
-              window.location.reload();
-            }}
-            onError={(err) => alert("❌ Erreur PayPal : " + err.message)}
-          />
+        ><PayPalButtons
+  style={{ layout: "vertical", color: "blue", shape: "rect" }}
+  createOrder={async () => {
+    // 🔁 Choix automatique entre local et production
+    const API_BASE =
+      window.location.hostname === "localhost"
+        ? "http://localhost:10000"
+        : "https://nudify-backend.onrender.com";
+
+    const res = await fetch(`${API_BASE}/api/paypal/create-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "1.00" }), // ✅ on envoie le montant attendu
+    });
+
+    const data = await res.json();
+    console.log("✅ Réponse création commande :", data);
+    return data.id;
+  }}
+  onApprove={async (data) => {
+    // 🔁 Même logique pour la capture
+    const API_BASE =
+      window.location.hostname === "localhost"
+        ? "http://localhost:10000"
+        : "https://nudify-backend.onrender.com";
+
+    const captureRes = await fetch(`${API_BASE}/api/paypal/capture-order`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: data.orderID }),
+    });
+
+    const captureData = await captureRes.json();
+    console.log("✅ Commande capturée :", captureData);
+  }}
+/>
+
         </PayPalScriptProvider>
       </div>
     </div>

@@ -2,7 +2,7 @@ import React from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 export default function Tarifs() {
-  const email = "demo@nudify.fr"; // tu pourras le remplacer plus tard par l'utilisateur connecté
+  const email = "demo@nudify.fr"; // tu pourras plus tard utiliser le vrai utilisateur connecté
 
   const tarifs = [
     {
@@ -11,7 +11,7 @@ export default function Tarifs() {
       description: "1 crédit par génération IA",
       color: "from-blue-400 to-pink-500",
       price: "1 €",
-      value: "1",
+      value: "1.00",
       benefits: ["1 image générée", "Résultat HD", "Livraison instantanée"],
     },
     {
@@ -20,7 +20,7 @@ export default function Tarifs() {
       description: "Accès prioritaire + génération rapide",
       color: "from-pink-400 to-purple-500",
       price: "15 €",
-      value: "15",
+      value: "15.00",
       benefits: [
         "20 images générées",
         "Accès prioritaire",
@@ -33,7 +33,7 @@ export default function Tarifs() {
       description: "Support prioritaire + bonus crédits",
       color: "from-blue-500 to-cyan-400",
       price: "30 €",
-      value: "30",
+      value: "30.00",
       benefits: [
         "50 images générées",
         "Support premium",
@@ -42,22 +42,31 @@ export default function Tarifs() {
     },
   ];
 
+  // 🔁 Détection automatique de l'environnement
+  const API_BASE =
+    window.location.hostname === "localhost"
+      ? "http://localhost:10000"
+      : "https://nudify-backend.onrender.com";
+
   const createOrder = async (amount) => {
-    const res = await fetch("https://nudify-backend.onrender.com/api/paypal/create-order", {
+    const res = await fetch(`${API_BASE}/api/paypal/create-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, amount }),
+      body: JSON.stringify({ amount }),
     });
     const data = await res.json();
+    console.log("✅ Commande PayPal créée :", data);
     return data.id;
   };
 
   const captureOrder = async (orderId) => {
-    await fetch("https://nudify-backend.onrender.com/api/paypal/capture-order", {
+    const res = await fetch(`${API_BASE}/api/paypal/capture-order`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId, email }),
     });
+    const data = await res.json();
+    console.log("✅ Commande capturée :", data);
     alert("✅ Paiement réussi ! Tes crédits ont été ajoutés.");
     window.location.reload();
   };
@@ -80,9 +89,9 @@ export default function Tarifs() {
         }}
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {tarifs.map((item, i) => (
+          {tarifs.map((item) => (
             <div
-              key={i}
+              key={item.id}
               className="bg-[#252542] rounded-2xl p-8 shadow-xl border border-white/10 hover:scale-105 hover:border-pink-400/40 transition-all duration-300 flex flex-col items-center"
             >
               <h2
@@ -115,4 +124,3 @@ export default function Tarifs() {
     </div>
   );
 }
-
