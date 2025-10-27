@@ -1,62 +1,86 @@
-// === Importations et configuration ===
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const { paypal, client } = require('./paypal');
+import express from "express";
+import cors from "cors";
+import bodyParser from "body-parser";
+import paypal from "@paypal/checkout-server-sdk";
+import mongoose from "mongoose";
+import dotenv from "dotenv";
 
-// Initialise Express
+dotenv.config();
 const app = express();
-
-// Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-// === ROUTES PAYPAL ===
+// 🧩 MongoDB connection
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+mongoose.connection.on("connected", () =>
+  console.log("✅ Connecté à MongoDB avec succès")
+);
 
-// Créer une commande
-app.post('/api/paypal/create-order', async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "email requis" });
+// 🧾 Schéma utilisateur
+const userSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  credits: { type: Number, default: 0 },
+});
+const User = mongoose.model("User", userSchema);
 
+// ⚙️ Config PayPal
+const Environment = paypal.core.SandboxEnvironment;
+const client = new paypal.core.PayPalHttpClient(
+  new Environment(
+    process.env.PAYPAL_CLIENT_ID,
+    process.env.PAYPAL_SECRET
+  )
+);
+
+// 🔹 Créer une commande PayPal
+app.post("/api/paypal/create-order", async (req, res) => {
+  const { amount } = req.body;
   const request = new paypal.orders.OrdersCreateRequest();
-  request.prefer("return=representation");
   request.requestBody({
     intent: "CAPTURE",
-    purchase_units: [{
-      amount: { currency_code: "EUR", value: "5.00" },
-      description: "Pack de 100 crédits Nudify",
-    }],
+    purchase_units: [{ amount: { currency_code: "EUR", value: amount } }],
   });
 
-  try {
-    const order = await client.execute(request);
-    res.json({ id: order.result.id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur création commande PayPal" });
-  }
+  const order = await client.execute(request);
+  res.json({ id: order.result.id });
 });
 
-// Capturer le paiement
-app.post('/api/paypal/capture-order', async (req, res) => {
-  const { orderId } = req.body;
-  if (!orderId) return res.status(400).json({ error: "orderId manquant" });
+// 🔹 Capturer une commande et ajouter les crédits
+app.post("/api/paypal/capture-order", async (req, res) => {
+  const { orderId, email } = req.body;
+  const request = new paypal.orders.OrdersCaptureRequest(orderId);
+  request.requestBody({});
+  const capture = await client.execute(request);
 
-  const captureRequest = new paypal.orders.OrdersCaptureRequest(orderId);
-  captureRequest.requestBody({});
+  const amount = parseFloat(
+    capture.result.purchase_units[0].payments.captures[0].amount.value
+  );
 
-  try {
-    const capture = await client.execute(captureRequest);
-    console.log("✅ Paiement PayPal capturé:", capture.result.status);
-    res.json({ success: true });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur capture paiement" });
-  }
+  // 🎯 Attribution automatique selon ton barème
+  let credits = 0;
+  if (amount === 1.0) credits = 1;
+  else if (amount === 15.0) credits = 20;
+  else if (amount === 30.0) credits = 50;
+
+  // 📊 Mise à jour dans MongoDB
+  const user = await User.findOneAndUpdate(
+    { email },
+    { $inc: { credits: credits } },
+    { new: true, upsert: true }
+  );
+
+  res.json({ success: true, newCredits: user.credits });
 });
 
-// === Lancement du serveur ===
-const PORT = process.env.PORT || 4242;
-app.listen(PORT, () => {
-  console.log(`✅ Backend on http://localhost:${PORT}`);
+// 🔹 Récupérer les crédits actuels
+app.get("/api/credits/:email", async (req, res) => {
+  const { email } = req.params;
+  const user = await User.findOne({ email });
+  res.json({ credits: user ? user.credits : 0 });
 });
+
+// 🟢 Serveur actif
+app.listen(3001, () => console.log("🚀 Serveur backend actif sur le port 3001"));
