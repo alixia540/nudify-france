@@ -81,7 +81,11 @@ export default function Layout({ children }) {
           <Link to="/avant-apres" className="hover:text-blue-400">Avant / Après</Link>
           <Link to="/support" className="hover:text-blue-400">Support</Link>
 
-<Link to="/mon-espace" className="hover:text-blue-400">Mon espace</Link>
+{localStorage.getItem("token") && (
+  <Link to="/mon-espace" className="hover:text-blue-400">
+    Mon espace
+  </Link>
+)}
 
 
           {!localStorage.getItem("token") ? (
