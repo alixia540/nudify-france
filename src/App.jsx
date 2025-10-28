@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
+import MonEspace from "./pages/MonEspace";
 
 
 
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/support" element={<Support />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/mon-espace" element={<MonEspace />} />
           <Route
   path="/dashboard"
   element={
