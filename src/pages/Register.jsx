@@ -1,8 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
   const API_BASE =
     window.location.hostname === "localhost"
@@ -11,6 +15,8 @@ export default function Register() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError("");
 
     try {
       const res = await fetch(`${API_BASE}/api/register`, {
@@ -20,58 +26,60 @@ export default function Register() {
       });
 
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur inconnue");
 
-      if (res.ok) {
-        alert("✅ Compte créé avec succès !");
-        window.location.href = "/login";
-      } else {
-        alert("❌ " + (data.error || "Erreur lors de l'inscription"));
-      }
+      alert("✅ Compte créé avec succès !");
+      navigate("/login");
     } catch (err) {
-      alert("❌ Erreur réseau : " + err.message);
+      setError("❌ " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#1E1E2F] text-white flex flex-col items-center justify-center">
-      <h1 className="text-4xl font-bold mb-6 bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent">
-        Créer un compte
-      </h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#1E1E2F] text-white px-6">
+      <div className="bg-[#252542] p-8 rounded-2xl shadow-xl w-full max-w-md border border-white/10">
+        <h1 className="text-3xl font-bold text-center bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent mb-6">
+          Créer un compte
+        </h1>
 
-      <form
-        onSubmit={handleRegister}
-        className="bg-[#252542] p-8 rounded-2xl shadow-xl w-80 flex flex-col gap-4 border border-white/10"
-      >
-        <input
-          type="email"
-          placeholder="Adresse e-mail"
-          className="p-3 rounded text-black"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Mot de passe"
-          className="p-3 rounded text-black"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button
-          type="submit"
-          className="bg-gradient-to-r from-blue-500 to-pink-500 py-3 rounded-lg font-semibold hover:opacity-90 transition"
-        >
-          S'inscrire
-        </button>
-      </form>
+        <form onSubmit={handleRegister} className="space-y-4">
+          <input
+            type="email"
+            placeholder="Adresse email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full p-3 rounded-lg bg-[#1E1E2F] border border-gray-600 focus:border-pink-400 outline-none"
+          />
+          <input
+            type="password"
+            placeholder="Mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full p-3 rounded-lg bg-[#1E1E2F] border border-gray-600 focus:border-pink-400 outline-none"
+          />
 
-      <p className="mt-4 text-gray-400">
-        Déjà un compte ?{" "}
-        <a href="/login" className="text-pink-400 hover:underline">
-          Se connecter
-        </a>
-      </p>
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-gradient-to-r from-pink-500 to-blue-500 rounded-lg font-semibold hover:scale-105 transition-transform duration-200"
+          >
+            {loading ? "Création..." : "S’inscrire"}
+          </button>
+        </form>
+
+        <p className="text-center mt-4 text-gray-400 text-sm">
+          Déjà un compte ?{" "}
+          <Link to="/login" className="text-pink-400 hover:underline">
+            Se connecter
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

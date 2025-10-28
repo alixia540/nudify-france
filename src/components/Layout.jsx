@@ -4,11 +4,12 @@ import logo from "../assets/logo.png";
 
 export default function Layout({ children }) {
   const [credits, setCredits] = useState(0);
+  const [userEmail, setUserEmail] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const navigate = useNavigate();
 
-  const email = localStorage.getItem("email") || "demo@nudify.fr";
+  const email = localStorage.getItem("email") || null;
 
   const API_BASE =
     window.location.hostname === "localhost"
@@ -18,6 +19,8 @@ export default function Layout({ children }) {
   // 📊 Récupération des crédits utilisateur
   useEffect(() => {
     if (!email) return;
+
+    setUserEmail(email);
     fetch(`${API_BASE}/api/credits/${email}`, {
       headers: { "x-api-key": "NUDIFY_SUPER_SECRET_2025" },
     })
@@ -26,7 +29,7 @@ export default function Layout({ children }) {
       .catch(() => setCredits(0));
   }, [email]);
 
-  // 🎢 Effet au scroll
+  // 🎢 Effet au scroll (réduction du header)
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
@@ -43,7 +46,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen bg-[#1E1E2F] text-white">
-      {/* Barre du haut */}
+      {/* 🔝 Barre du haut */}
       <header
         className={`fixed top-0 left-0 w-full bg-[#252542] shadow-lg flex items-center justify-between px-6 md:px-10 transition-all duration-300 z-50 ${
           scrolled ? "py-3 backdrop-blur-sm bg-opacity-90" : "py-5"
@@ -78,6 +81,12 @@ export default function Layout({ children }) {
           <Link to="/avant-apres" className="hover:text-blue-400">Avant / Après</Link>
           <Link to="/support" className="hover:text-blue-400">Support</Link>
 
+{localStorage.getItem("token") && (
+  <Link to="/dashboard" className="hover:text-blue-400">
+    Mon espace
+  </Link>
+)}
+
           {!localStorage.getItem("token") ? (
             <>
               <Link
@@ -103,11 +112,19 @@ export default function Layout({ children }) {
           )}
         </nav>
 
-        {/* Crédits + menu mobile */}
+        {/* Crédits + email + menu mobile */}
         <div className="flex items-center space-x-4">
+          {userEmail && (
+            <span className="text-gray-300 text-sm hidden sm:block truncate max-w-[140px]">
+              {userEmail}
+            </span>
+          )}
+
           <span className="bg-blue-600 px-5 py-2 rounded-full text-sm font-semibold shadow-md whitespace-nowrap">
             💰 {credits} crédits
           </span>
+
+          {/* Menu mobile */}
           <button
             className="md:hidden text-2xl focus:outline-none select-none"
             onClick={() => setMenuOpen(!menuOpen)}
