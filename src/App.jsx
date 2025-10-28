@@ -8,18 +8,18 @@ import AvantApres from "./pages/AvantApres";
 import Support from "./pages/Support";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import MonEspace from "./pages/MonEspace";
+import MonEspace from "./pages/MonEspace"; // ✅ c’est bien ce composant
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
 
-  // ✅ Vérifie le token après le montage
+  // ✅ Vérifie le token une seule fois
   useEffect(() => {
     const token = localStorage.getItem("token");
     setIsAuthenticated(!!token);
   }, []);
 
-  // ⏳ Pendant la vérification, on affiche un écran d’attente (évite le “saut” visuel)
+  // ⏳ Petit écran d’attente
   if (isAuthenticated === null) {
     return (
       <div className="min-h-screen bg-[#1E1E2F] text-white flex items-center justify-center text-xl">
@@ -44,7 +44,11 @@ export default function App() {
           <Route
             path="/mon-espace"
             element={
-              isAuthenticated ? <MonEspace /> : <Navigate to="/login" replace />
+              localStorage.getItem("token") ? (
+                <MonEspace />
+              ) : (
+                <Navigate to="/login" />
+              )
             }
           />
 

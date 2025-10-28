@@ -36,6 +36,17 @@ export default function Layout({ children }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+{localStorage.getItem("token") && (
+  <Link
+    to="/mon-espace"
+    className="text-lg hover:text-blue-400"
+    onClick={() => setMenuOpen(false)}
+  >
+    Mon espace
+  </Link>
+)}
+
+
   // 🚪 Déconnexion
   const handleLogout = () => {
     localStorage.removeItem("token");
