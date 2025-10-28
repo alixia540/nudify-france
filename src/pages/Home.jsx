@@ -13,17 +13,20 @@ export default function Home() {
       : "https://nudify-backend.onrender.com";
 
   return (
-    <div className="min-h-screen bg-[#1E1E2F] text-white flex flex-col items-center justify-center px-6 pt-10 md:pt-20 pb-16">
+    <div className="min-h-screen bg-[#1E1E2F] text-white flex flex-col items-center justify-center px-6 pt-6 md:pt-16 pb-16">
       {/* 🌸 Logo */}
       <img
         src={logo}
         alt="Nudify France Logo"
-        className="w-40 h-40 mb-6 select-none drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]"
+        className="w-48 h-48 mb-10 select-none"
       />
 
       {/* 🏠 Titre principal */}
-      <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6 bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent">
-        Bienvenue sur Nudify France
+      <h1 className="text-5xl md:text-6xl font-extrabold text-center mb-6">
+        <span className="text-white">Bienvenue sur </span>
+        <span className="bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent">
+          Nudify France
+        </span>
       </h1>
 
       <p className="text-center text-gray-300 max-w-2xl mb-12">
@@ -67,8 +70,11 @@ export default function Home() {
 
       {/* --- 🖼️ Avant / Après Aperçu --- */}
       <div className="mt-8 text-center">
-        <h2 className="text-3xl font-bold mb-10 bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent">
-          Exemple avant / après
+        <h2 className="text-3xl font-bold mb-10">
+          <span className="text-white">Exemple </span>
+          <span className="bg-gradient-to-r from-blue-400 to-pink-500 bg-clip-text text-transparent">
+            Avant / Après
+          </span>
         </h2>
 
         <div className="flex flex-col md:flex-row justify-center items-center gap-10">
