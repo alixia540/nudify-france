@@ -20,10 +20,14 @@ export default function Register() {
 
     try {
       const res = await fetch(`${API_BASE}/api/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "x-api-key": "NUDIFY_SUPER_SECRET_2025",
+  },
+  body: JSON.stringify({ email, password }),
+});
+
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur inconnue");
