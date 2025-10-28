@@ -36,17 +36,6 @@ export default function Layout({ children }) {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-{localStorage.getItem("token") && (
-  <Link
-    to="/mon-espace"
-    className="text-lg hover:text-blue-400"
-    onClick={() => setMenuOpen(false)}
-  >
-    Mon espace
-  </Link>
-)}
-
-
   // 🚪 Déconnexion
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -92,19 +81,16 @@ export default function Layout({ children }) {
           <Link to="/avant-apres" className="hover:text-blue-400">Avant / Après</Link>
           <Link to="/support" className="hover:text-blue-400">Support</Link>
 
-{localStorage.getItem("token") && (
-  <Link to="/mon-espace" className="hover:text-blue-400">
-    Mon espace
-  </Link>
-)}
-
+          {/* ✅ Mon espace visible si connecté */}
+          {localStorage.getItem("token") && (
+            <Link to="/mon-espace" className="hover:text-blue-400">
+              Mon espace
+            </Link>
+          )}
 
           {!localStorage.getItem("token") ? (
             <>
-              <Link
-                to="/login"
-                className="hover:text-pink-400 font-semibold"
-              >
+              <Link to="/login" className="hover:text-pink-400 font-semibold">
                 Connexion
               </Link>
               <Link
@@ -147,13 +133,24 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      {/* Menu mobile */}
+      {/* ✅ Menu mobile corrigé */}
       {menuOpen && (
         <div className="fixed top-20 left-0 w-full bg-[#1E1E2F] flex flex-col items-center space-y-4 py-6 z-40 border-t border-gray-700">
           <Link to="/" className="text-lg hover:text-blue-400" onClick={() => setMenuOpen(false)}>Accueil</Link>
           <Link to="/tarifs" className="text-lg hover:text-blue-400" onClick={() => setMenuOpen(false)}>Tarifs</Link>
           <Link to="/avant-apres" className="text-lg hover:text-blue-400" onClick={() => setMenuOpen(false)}>Avant / Après</Link>
           <Link to="/support" className="text-lg hover:text-blue-400" onClick={() => setMenuOpen(false)}>Support</Link>
+
+          {/* ✅ Mon espace visible uniquement si connecté */}
+          {localStorage.getItem("token") && (
+            <Link
+              to="/mon-espace"
+              className="text-lg hover:text-blue-400"
+              onClick={() => setMenuOpen(false)}
+            >
+              Mon espace
+            </Link>
+          )}
 
           {!localStorage.getItem("token") ? (
             <>
